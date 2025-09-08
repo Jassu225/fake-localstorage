@@ -1,5 +1,5 @@
 {
-  "name": "fake-localstorage",
+  "name": "ts-fake-localstorage",
   "version": "1.0.0",
   "description": "A fake localStorage implementation for testing in browsers and Node.js",
   "main": "dist/index.js",
