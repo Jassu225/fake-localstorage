@@ -15,7 +15,7 @@ export {
   StorageEventInitType as StorageEventInit,
 };
 
-export class FakeStorage implements Storage {
+class FakeStorage implements Storage {
   private _data: Map<string, string> = new Map();
   private _length: number = 0;
 
@@ -80,10 +80,9 @@ export class FakeStorage implements Storage {
 
     if (wasPresent) {
       this._length--;
+      // Dispatch storage event
+      this._dispatchStorageEvent(key, null, oldValue);
     }
-
-    // Dispatch storage event
-    this._dispatchStorageEvent(key, null, oldValue);
   }
 
   clear(): void {
@@ -131,7 +130,7 @@ export class FakeStorage implements Storage {
 
   forEach(
     callback: (value: string, key: string, storage: Storage) => void,
-    thisArg?: any
+    thisArg?: unknown
   ): void {
     this._data.forEach((value, key) => {
       callback.call(thisArg, value, key, this);
@@ -177,3 +176,9 @@ export class FakeStorage implements Storage {
 const fakeLocalStorage = new FakeStorage();
 
 export default fakeLocalStorage;
+
+export const isInstanceOfFakeStorage = (
+  instance: unknown
+): instance is FakeStorage => {
+  return instance instanceof FakeStorage;
+};

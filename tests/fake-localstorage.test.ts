@@ -2,20 +2,24 @@
  * Tests for fake-localstorage implementation
  */
 
-import fakeLocalStorage from "../src/fake-localstorage";
-import { FakeStorage } from "../src/fake-localstorage";
+import fakeLocalStorage, {
+  isInstanceOfFakeStorage,
+} from "../src/fake-localstorage";
 import { StorageEvent, StorageEventInit } from "../src/storage-event";
 import {
   onStorageEvent,
   offStorageEvent,
   clearStorageEvents,
 } from "../src/event-emiter";
+import { waitForCalls } from "./utils";
 
 describe("FakeStorage", () => {
-  let storage: FakeStorage;
+  let storage: typeof fakeLocalStorage;
 
   beforeEach(() => {
-    storage = new FakeStorage();
+    fakeLocalStorage.reset();
+    clearStorageEvents();
+    storage = fakeLocalStorage;
   });
 
   describe("Basic functionality", () => {
@@ -152,44 +156,44 @@ describe("FakeStorage", () => {
   });
 
   describe("Storage events", () => {
-    let mockDispatchEvent: jest.Mock;
-
-    beforeEach(() => {
-      mockDispatchEvent = jest.fn();
-      globalThis.dispatchEvent = mockDispatchEvent;
+    test("should dispatch storage event on setItem", (done) => {
+      onStorageEvent((event) => {
+        expect(event).toEqual(
+          expect.objectContaining({
+            key: "key1",
+            newValue: "value1",
+            oldValue: null,
+            storageArea: storage,
+          })
+        );
+        done();
+      });
+      storage.setItem("key1", "value1");
     });
 
-    test("should dispatch storage event on setItem", () => {
+    test("should dispatch storage event on removeItem", (done) => {
       storage.setItem("key1", "value1");
-      expect(mockDispatchEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          key: "key1",
-          newValue: "value1",
-          oldValue: null,
-          storageArea: storage,
-        })
-      );
-    });
-
-    test("should dispatch storage event on removeItem", () => {
-      storage.setItem("key1", "value1");
-      mockDispatchEvent.mockClear();
+      onStorageEvent((event) => {
+        expect(event).toEqual(
+          expect.objectContaining({
+            key: "key1",
+            newValue: null,
+            oldValue: "value1",
+            storageArea: storage,
+          })
+        );
+        done();
+      });
       storage.removeItem("key1");
-      expect(mockDispatchEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          key: "key1",
-          newValue: null,
-          oldValue: "value1",
-          storageArea: storage,
-        })
-      );
     });
 
-    test("should dispatch storage event on clear", () => {
+    test("should dispatch storage event on clear", async () => {
       storage.setItem("key1", "value1");
       storage.setItem("key2", "value2");
-      mockDispatchEvent.mockClear();
+      const mockDispatchEvent = jest.fn();
+      onStorageEvent(mockDispatchEvent);
       storage.clear();
+      await waitForCalls(mockDispatchEvent, 2);
       expect(mockDispatchEvent).toHaveBeenCalledTimes(2);
     });
   });
@@ -197,7 +201,7 @@ describe("FakeStorage", () => {
 
 describe("Default export", () => {
   test("should export a FakeStorage instance", () => {
-    expect(fakeLocalStorage).toBeInstanceOf(FakeStorage);
+    expect(isInstanceOfFakeStorage(fakeLocalStorage)).toBe(true);
   });
 
   test("should be a singleton", () => {
@@ -207,8 +211,16 @@ describe("Default export", () => {
 });
 
 describe("StorageEvent", () => {
+  let storage: typeof fakeLocalStorage;
+
+  beforeEach(() => {
+    fakeLocalStorage.reset();
+    clearStorageEvents();
+    storage = fakeLocalStorage;
+  });
   test("should create StorageEvent with default values", () => {
     const event = new StorageEvent("storage");
+    // console.log("event ----------------", event);
     expect(event.type).toBe("storage");
     expect(event.key).toBeNull();
     expect(event.newValue).toBeNull();
@@ -218,7 +230,6 @@ describe("StorageEvent", () => {
   });
 
   test("should create StorageEvent with custom values", () => {
-    const storage = new FakeStorage();
     const eventInit: StorageEventInit = {
       key: "test-key",
       newValue: "new-value",
@@ -257,14 +268,13 @@ describe("StorageEvent", () => {
 });
 
 describe("Storage Event Listeners (Standalone Mode)", () => {
-  let storage: FakeStorage;
+  let storage: typeof fakeLocalStorage;
   let mockListener: jest.Mock;
 
   beforeEach(() => {
-    storage = new FakeStorage();
+    fakeLocalStorage.reset();
+    storage = fakeLocalStorage;
     mockListener = jest.fn();
-    // Clear any existing listeners
-    clearStorageEvents();
   });
 
   afterEach(() => {
@@ -464,34 +474,6 @@ describe("Storage Event Listeners (Standalone Mode)", () => {
       expect(removeEvent.newValue).toBeNull();
       expect(removeEvent.oldValue).toBe("value1");
       expect(removeEvent.storageArea).toBe(storage);
-    });
-  });
-
-  describe("Multiple Storage Instances", () => {
-    test("should dispatch events for each storage instance", () => {
-      const storage1 = new FakeStorage();
-      const storage2 = new FakeStorage();
-      const listener1 = jest.fn();
-      const listener2 = jest.fn();
-
-      onStorageEvent(listener1);
-      onStorageEvent(listener2);
-
-      storage1.setItem("key1", "value1");
-      storage2.setItem("key2", "value2");
-
-      // Both listeners should receive events from both storages
-      expect(listener1).toHaveBeenCalledTimes(2);
-      expect(listener2).toHaveBeenCalledTimes(2);
-
-      // Check that events have correct storageArea
-      const events1 = listener1.mock.calls.map((call) => call[0]);
-      const events2 = listener2.mock.calls.map((call) => call[0]);
-
-      expect(events1.some((e) => e.storageArea === storage1)).toBe(true);
-      expect(events1.some((e) => e.storageArea === storage2)).toBe(true);
-      expect(events2.some((e) => e.storageArea === storage1)).toBe(true);
-      expect(events2.some((e) => e.storageArea === storage2)).toBe(true);
     });
   });
 

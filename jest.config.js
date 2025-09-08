@@ -13,4 +13,6 @@ module.exports = {
   testEnvironmentOptions: {
     url: "http://localhost",
   },
+  verbose: true,
+  silent: false,
 };
